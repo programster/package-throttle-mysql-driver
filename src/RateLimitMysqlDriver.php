@@ -1,0 +1,103 @@
+<?php
+
+namespace Programster\Throttle\MySQL;
+
+class RateLimitMysqlDriver
+{
+    private readonly string $m_tableName;
+    private mysqli $m_db;
+
+    private RateLimitCollection $exceededRateLimits;
+    private bool $m_hasProcessed = false;
+
+    public function __construct(mysqli $db, string $tableName)
+    {
+        $this->m_db = $db;
+        $this->m_tableName = $tableName;
+        $this->m_exceededRateLimits = new RateLimitCollection();
+    }
+
+
+    /**
+     * Processes the request, returning the rate limits that the request exceeds. If the array is empty
+     * then the request did not exceed any rate limits.
+     * @param string $requestIdentifier
+     * @param RateLimitCollection $rateLimits
+     * @return array
+     */
+    public function process(string $requestIdentifier, string $throttleId, RateLimitCollection $rateLimits)
+    {
+        $escapedThrottleIdentifier = mysqli_escape_string($this->m_db, $throttleId);
+        $escapedRequestIdentifier = mysqli_escape_string($this->m_db, $requestIdentifier);
+        $this->pruneOldRequests($rateLimits);
+        $this->storeRequest($requestIdentifier);
+
+        foreach ($rateLimits as $rateLimit)
+        {
+            /* @var $rateLimit RateLimit */
+            $minAllowedTime = time() - $rateLimit->timePeriodInSeconds;
+
+            // now check if we have exceeded the limit.
+            $query = "SELECT * FROM {$this->getEscapedTableName()} WHERE `requestor_id` = '{$escapedRequestIdentifier}' AND `throttle_id` = '{$escapedThrottleIdentifier}' AND `when` >= {$minAllowedTime}";
+            $result = $this->m_db->query($query);
+
+            if ($result->num_rows > $rateLimit->numAllowedRequests)
+            {
+                $this->m_exceededRateLimits->append($rateLimit);
+            }
+        }
+    }
+
+
+    public function getCreateTableString() : string
+    {
+        return
+            "CREATE TABLE {$this->getEscapedTableName()} (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `requestor_id` varchar(255) NOT NULL,
+                `throttle_id` varchar(255) NOT NULL,
+                `when` INT UNSIGNED NOT NULL,
+                PRIMARY KEY (`id`),
+                INDEX idx_requestor_throttle (`requestor_id`,`throttle_id`),
+                INDEX idx_when (`when`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
+    }
+
+
+    private function pruneOldRequests(RateLimitCollection $rateLimits)
+    {
+        $escapedThrottleIdentifier = mysqli_escape_string($this->m_db, $this->throttleId);
+        $timeNow = time();
+        $maxTimePeriod = 0;
+
+        foreach ($rateLimits as $rateLimit)
+        {
+            $maxTimePeriod = max($maxTimePeriod, $rateLimit->timePeriodInSeconds);
+        }
+
+        $minAllowedTime = $timeNow - $maxTimePeriod;
+
+        // purge old requests that don't matter any more.
+        $query = "DELETE FROM {$this->getEscapedTableName()} WHERE `throttle_id` = '{$escapedThrottleIdentifier}' AND `when` < {$minAllowedTime}";
+        $this->m_db->query($query);
+    }
+
+
+    private function storeRequest(string $requestIdentifier)
+    {
+        $escapedThrottleIdentifier = mysqli_escape_string($this->m_db, $this->throttleId);
+        $timeNow = time();
+        $escapedRequestIdentifier = mysqli_escape_string($this->m_db, $requestIdentifier);
+        $query = "INSERT INTO {$this->getEscapedTableName()} SET `requestor_id` = '{$escapedRequestIdentifier}', `throttle_id` = '{$escapedThrottleIdentifier}', `when`={$timeNow}";
+        $this->m_db->query($query);
+    }
+
+
+    private function getEscapedTableName() : string { return mysqli_escape_string($this->m_db, $this->m_tableName); }
+
+
+    public function getExceededRateLimits() : RateLimitCollection
+    {
+        return $this->m_exceededRateLimits;
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "name": "programster/throttle-mysql-driver",
+    "type": "driver",
+    "description": "A driver for using MySQL for rate limiting in the programster/throttle package.",
+    "keywords": ["throttle", "rate-limiting", "mysql"],
+    "homepage": "https://github.com/programster/package-throttle-mysql-driver",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Stuart Page",
+            "email": "sdpagent@gmail.com",
+            "homepage": "https://blog.programster.org",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=8.1.0",
+        "programster/throttle": "0.1.*",
+        "ext-mysqli": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Programster\\Throttle\\MySQL": "src/"
+        }
+    }
+}
