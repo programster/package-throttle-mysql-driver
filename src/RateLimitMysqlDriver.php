@@ -2,6 +2,7 @@
 
 namespace Programster\Throttle\MySQL;
 
+use Programster\Throttle\RateLimit;
 use Programster\Throttle\RateLimitCollection;
 use Programster\Throttle\RateLimitDriverInterface;
 
@@ -24,14 +25,15 @@ class RateLimitMysqlDriver implements RateLimitDriverInterface
      * @param string $requestIdentifier
      * @param RateLimitCollection $rateLimits
      * @return array
+     * @throws \Exception
      */
     public function process(string $requestIdentifier, string $throttleId, RateLimitCollection $rateLimits) : RateLimitCollection
     {
         $exceededRateLimits = new RateLimitCollection();
         $escapedThrottleIdentifier = mysqli_escape_string($this->m_db, $throttleId);
         $escapedRequestIdentifier = mysqli_escape_string($this->m_db, $requestIdentifier);
-        $this->pruneOldRequests($rateLimits);
-        $this->storeRequest($requestIdentifier);
+        $this->pruneOldRequests($throttleId, $rateLimits);
+        $this->storeRequest($throttleId, $requestIdentifier);
 
         foreach ($rateLimits as $rateLimit)
         {
@@ -67,9 +69,9 @@ class RateLimitMysqlDriver implements RateLimitDriverInterface
     }
 
 
-    private function pruneOldRequests(RateLimitCollection $rateLimits)
+    private function pruneOldRequests(string $throttleId, RateLimitCollection $rateLimits) : void
     {
-        $escapedThrottleIdentifier = mysqli_escape_string($this->m_db, $this->throttleId);
+        $escapedThrottleIdentifier = mysqli_escape_string($this->m_db, $throttleId);
         $timeNow = time();
         $maxTimePeriod = 0;
 
@@ -86,9 +88,9 @@ class RateLimitMysqlDriver implements RateLimitDriverInterface
     }
 
 
-    private function storeRequest(string $requestIdentifier)
+    private function storeRequest(string $throttleId, string $requestIdentifier) : void
     {
-        $escapedThrottleIdentifier = mysqli_escape_string($this->m_db, $this->throttleId);
+        $escapedThrottleIdentifier = mysqli_escape_string($this->m_db, $throttleId);
         $timeNow = time();
         $escapedRequestIdentifier = mysqli_escape_string($this->m_db, $requestIdentifier);
         $query = "INSERT INTO {$this->getEscapedTableName()} SET `requestor_id` = '{$escapedRequestIdentifier}', `throttle_id` = '{$escapedThrottleIdentifier}', `when`={$timeNow}";
