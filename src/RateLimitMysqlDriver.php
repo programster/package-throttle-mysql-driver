@@ -2,19 +2,19 @@
 
 namespace Programster\Throttle\MySQL;
 
-class RateLimitMysqlDriver
+use Programster\Throttle\RateLimitCollection;
+use Programster\Throttle\RateLimitDriverInterface;
+
+class RateLimitMysqlDriver implements RateLimitDriverInterface
 {
     private readonly string $m_tableName;
-    private mysqli $m_db;
+    private \mysqli $m_db;
 
-    private RateLimitCollection $exceededRateLimits;
-    private bool $m_hasProcessed = false;
 
     public function __construct(mysqli $db, string $tableName)
     {
         $this->m_db = $db;
         $this->m_tableName = $tableName;
-        $this->m_exceededRateLimits = new RateLimitCollection();
     }
 
 
@@ -25,8 +25,9 @@ class RateLimitMysqlDriver
      * @param RateLimitCollection $rateLimits
      * @return array
      */
-    public function process(string $requestIdentifier, string $throttleId, RateLimitCollection $rateLimits)
+    public function process(string $requestIdentifier, string $throttleId, RateLimitCollection $rateLimits) : RateLimitCollection
     {
+        $exceededRateLimits = new RateLimitCollection();
         $escapedThrottleIdentifier = mysqli_escape_string($this->m_db, $throttleId);
         $escapedRequestIdentifier = mysqli_escape_string($this->m_db, $requestIdentifier);
         $this->pruneOldRequests($rateLimits);
@@ -43,9 +44,11 @@ class RateLimitMysqlDriver
 
             if ($result->num_rows > $rateLimit->numAllowedRequests)
             {
-                $this->m_exceededRateLimits->append($rateLimit);
+                $exceededRateLimits->append($rateLimit);
             }
         }
+
+        return $exceededRateLimits;
     }
 
 
@@ -94,10 +97,4 @@ class RateLimitMysqlDriver
 
 
     private function getEscapedTableName() : string { return mysqli_escape_string($this->m_db, $this->m_tableName); }
-
-
-    public function getExceededRateLimits() : RateLimitCollection
-    {
-        return $this->m_exceededRateLimits;
-    }
 }
