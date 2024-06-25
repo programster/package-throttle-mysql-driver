@@ -11,7 +11,7 @@ class RateLimitMysqlDriver implements RateLimitDriverInterface
     private \mysqli $m_db;
 
 
-    public function __construct(mysqli $db, string $tableName)
+    public function __construct(\mysqli $db, string $tableName)
     {
         $this->m_db = $db;
         $this->m_tableName = $tableName;
