@@ -20,7 +20,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Programster\\Throttle\\MySQL": "src/"
+            "Programster\\Throttle\\MySQL\\": "src/"
         }
     }
 }
