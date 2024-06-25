@@ -5,6 +5,8 @@ namespace Programster\Throttle\MySQL;
 use Programster\Throttle\RateLimit;
 use Programster\Throttle\RateLimitCollection;
 use Programster\Throttle\RateLimitDriverInterface;
+use Programster\Throttle\RateLimitOverflow;
+use Programster\Throttle\RateLimitOverflowCollection;
 
 class RateLimitMysqlDriver implements RateLimitDriverInterface
 {
@@ -27,9 +29,13 @@ class RateLimitMysqlDriver implements RateLimitDriverInterface
      * @return array
      * @throws \Exception
      */
-    public function process(string $requestIdentifier, string $throttleId, RateLimitCollection $rateLimits) : RateLimitCollection
+    public function process(
+        string $requestIdentifier,
+        string $throttleId,
+        RateLimitCollection $rateLimits
+    ) : RateLimitOverflowCollection
     {
-        $exceededRateLimits = new RateLimitCollection();
+        $rateLimitOverflows = new RateLimitOverflowCollection();
         $escapedThrottleIdentifier = mysqli_escape_string($this->m_db, $throttleId);
         $escapedRequestIdentifier = mysqli_escape_string($this->m_db, $requestIdentifier);
         $this->pruneOldRequests($throttleId, $rateLimits);
@@ -46,11 +52,12 @@ class RateLimitMysqlDriver implements RateLimitDriverInterface
 
             if ($result->num_rows > $rateLimit->numAllowedRequests)
             {
-                $exceededRateLimits->append($rateLimit);
+                $overflow = new RateLimitOverflow($rateLimit, $result->num_rows);
+                $rateLimitOverflows->append($overflow);
             }
         }
 
-        return $exceededRateLimits;
+        return $rateLimitOverflows;
     }
 
 
